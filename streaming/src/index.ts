@@ -10,10 +10,18 @@ const server: http.Server = app.listen(config.port, () => {
 	const io_ = getSocketIO();
 	io.on("connection", (socket) => {
 		console.log("a user connected");
-		socket.on("data", (data: { frame_id: string; frame: string }) => {
-			console.log(data.frame_id);
-			io_.emit("data", data);
-		});
+		socket.on(
+			"data",
+			(data: {
+				frame_id: string;
+				frame: string;
+				frame_width: number;
+				frame_height: number;
+			}) => {
+				console.log(data.frame_id);
+				io_.emit("data", data);
+			},
+		);
 	});
 
 	io.on("disconnect", () => {

@@ -9,7 +9,15 @@ from dotenv import load_dotenv
 def send_frame(sio, frame):
     _, buffer = cv2.imencode(".jpg", frame)
     frame_base64 = base64.b64encode(buffer).decode("utf-8")
-    sio.emit("data", {"frame_id": str(uuid.uuid4()), "frame": frame_base64})
+    sio.emit(
+        "data",
+        {
+            "frame_id": str(uuid.uuid4()),
+            "frame": frame_base64,
+            "frame_width": frame.shape[1],
+            "frame_height": frame.shape[0],
+        },
+    )
 
 
 load_dotenv()
