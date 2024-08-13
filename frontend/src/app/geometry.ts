@@ -1,4 +1,6 @@
-export class Point {
+import { drawPoint } from "./drawer";
+
+export class Coordinate {
 	x: number;
 	y: number;
 
@@ -7,6 +9,27 @@ export class Point {
 		this.y = y;
 	}
 
+	isNearPoint(point: Point) {
+		const dx = this.x - point.x;
+		const dy = this.y - point.y;
+		return dx * dx + dy * dy < 100;
+	}
+
+	findNearesPolygonPoint(polygons: Polygon[]) {
+		for (let i = 0; i < polygons.length; i++) {
+			const polygon = polygons[i];
+			for (let j = 0; j < polygon.points.length; j++) {
+				if (this.isNearPoint(polygon.points[j])) {
+					return { polygonIndex: i, pointIndex: j };
+				}
+			}
+		}
+
+		return { polygonIndex: -1, pointIndex: -1 };
+	}
+}
+
+export class Point extends Coordinate {
 	draw(
 		ctx: CanvasRenderingContext2D,
 		color: string | CanvasGradient | CanvasPattern = "red",
@@ -30,16 +53,6 @@ export class Polygon {
 
 	addPoint(point: Point) {
 		if (this.isClosed) {
-			return;
-		}
-
-		if (
-			this.points.length > 2 &&
-			(this.getFirstPoint().x - point.x) ** 2 +
-				(this.getFirstPoint().y - point.y) ** 2 <
-				100
-		) {
-			this.close();
 			return;
 		}
 
@@ -68,9 +81,9 @@ export class Polygon {
 
 	draw(ctx: CanvasRenderingContext2D) {
 		this.points.forEach((point: Point, index) => {
-			point.draw(ctx, "red");
+			drawPoint(ctx, point, "red");
 		});
-		!this.isClosed && this.points[0].draw(ctx, "green");
+		!this.isClosed && drawPoint(ctx, this.points[0], "green");
 
 		ctx.strokeStyle = "blue";
 		ctx.fillStyle = "rgba(0, 0, 255, 0.3)";

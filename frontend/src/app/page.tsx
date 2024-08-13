@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import io from "socket.io-client";
-import { Point, Polygon } from "./geometry";
+import { Coordinate, type Point, Polygon } from "./geometry";
+import { drawCrosshair, drawMousePosition } from "./drawer";
 
 const SOCKET_URL = process.env.SOCKET_URL || "http://localhost:6001";
 
@@ -40,6 +41,11 @@ export default function Home() {
 	const [showCrosshair, setShowCrosshair] = useState(true);
 	const [showMousePosition, setShowMousePosition] = useState(true);
 
+	const [clickedPoint, setClickedPoint] = useState<{
+		polygonIndex: number;
+		pointIndex: number;
+	} | null>(null);
+
 	const addPolygon = () => {
 		console.log("Now you can draw a polygon");
 
@@ -59,16 +65,41 @@ export default function Home() {
 		setPolygons([]);
 	};
 
+	const coordinateIsCloseToPolygonPoint = (coordinate: Coordinate) => {
+		for (let i = 0; i < polygons.length; i++) {
+			const polygon = polygons[i];
+			for (let j = 0; j < polygon.points.length; j++) {
+				if (coordinate.isNearPoint(polygon.points[j])) {
+					return { polygonIndex: i, pointIndex: j };
+				}
+			}
+		}
+
+		return { polygonIndex: -1, pointIndex: -1 };
+	};
+
 	const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
 		const canvas = canvasRef.current as HTMLCanvasElement;
 		const ctx = canvas.getContext("2d");
 		if (!ctx) return;
 
 		const rect = canvas.getBoundingClientRect();
-		const x = e.clientX - rect.left;
-		const y = e.clientY - rect.top;
+		// const x = e.clientX - rect.left;
+		// const y = e.clientY - rect.top;
+		const coordinate = new Coordinate(
+			e.clientX - rect.left,
+			e.clientY - rect.top,
+		);
 
 		ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+		if (clickedPoint) {
+			const { polygonIndex, pointIndex } = clickedPoint;
+			const currentPolygon = polygons[polygonIndex];
+			const currentPoint = currentPolygon.points[pointIndex];
+			currentPoint.x = coordinate.x;
+			currentPoint.y = coordinate.y;
+		}
 
 		if (polygons.length > 0) {
 			for (const polygon of polygons) {
@@ -76,22 +107,60 @@ export default function Home() {
 			}
 		}
 
+		if (clickedPoint) {
+			return;
+		}
+
+		const { polygonIndex, pointIndex } =
+			coordinate.findNearesPolygonPoint(polygons);
+
+		if (polygonIndex !== -1 && pointIndex !== -1) {
+			if (pointIndex === 0 && !polygons[polygonIndex].isClosed) {
+				const currentPolygon = polygons[polygonIndex];
+				const currentPoint = currentPolygon.points[pointIndex];
+
+				ctx.fillStyle = "red";
+				ctx.beginPath();
+				ctx.arc(currentPoint.x, currentPoint.y, 5, 0, 2 * Math.PI);
+				ctx.fill();
+				ctx.closePath();
+			}
+
+			canvas.style.cursor = "pointer";
+		} else {
+			canvas.style.cursor = "default";
+		}
+
 		if (showCrosshair) {
-			ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
-			ctx.lineWidth = 1;
-			ctx.beginPath();
-			ctx.moveTo(x, 0);
-			ctx.lineTo(x, canvas.height);
-			ctx.moveTo(0, y);
-			ctx.lineTo(canvas.width, y);
-			ctx.stroke();
+			drawCrosshair(ctx, coordinate, "rgba(0, 0, 0, 0.5)");
 		}
 
 		if (showMousePosition) {
-			ctx.fillStyle = "black";
-			ctx.font = "12px Arial";
-			ctx.fillText(`(${x}, ${y})`, x + 10, y - 10);
+			drawMousePosition(ctx, coordinate, "black");
 		}
+	};
+
+	const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+		const canvas = canvasRef.current as HTMLCanvasElement;
+		const ctx = canvas.getContext("2d");
+		if (!ctx) return;
+
+		const rect = canvas.getBoundingClientRect();
+		const coordinate = new Coordinate(
+			e.clientX - rect.left,
+			e.clientY - rect.top,
+		);
+
+		const { polygonIndex, pointIndex } =
+			coordinate.findNearesPolygonPoint(polygons);
+
+		if (polygonIndex !== -1 && pointIndex !== -1) {
+			setClickedPoint({ polygonIndex, pointIndex });
+		}
+	};
+
+	const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
+		setClickedPoint(null);
 	};
 
 	const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -100,11 +169,30 @@ export default function Home() {
 
 		const canvas = canvasRef.current as HTMLCanvasElement;
 		const rect = canvas.getBoundingClientRect();
-		const x = e.clientX - rect.left;
-		const y = e.clientY - rect.top;
+		const coordinate = new Coordinate(
+			e.clientX - rect.left,
+			e.clientY - rect.top,
+		);
+
+		const { polygonIndex, pointIndex } =
+			coordinateIsCloseToPolygonPoint(coordinate);
+
+		if (polygonIndex !== -1 && pointIndex !== -1 && pointIndex !== 0) {
+			return;
+		}
 
 		const currentPolygon = polygons[polygons.length - 1];
-		currentPolygon.addPoint(new Point(x, y));
+
+		if (
+			currentPolygon.points.length > 0 &&
+			coordinate.isNearPoint(currentPolygon.getFirstPoint())
+		) {
+			if (currentPolygon.points.length > 2) {
+				currentPolygon.close();
+			}
+		} else {
+			currentPolygon.addPoint(coordinate as Point);
+		}
 
 		if (currentPolygon.isClosed) {
 			setDrawing(false);
@@ -212,6 +300,8 @@ export default function Home() {
 				<canvas
 					ref={canvasRef}
 					onMouseMove={handleMouseMove}
+					onMouseDown={handleMouseDown}
+					onMouseUp={handleMouseUp}
 					onClick={handleCanvasClick}
 					onKeyDown={handleCanvasKeyDown}
 					onKeyUp={handleCanvasKeyUp}
