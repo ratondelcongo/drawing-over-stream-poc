@@ -26,8 +26,6 @@ function drawLine(
 	ctx.closePath();
 }
 
-// function draw;
-
 function drawPolygon(
 	ctx: CanvasRenderingContext2D,
 	points: { x: number; y: number }[],

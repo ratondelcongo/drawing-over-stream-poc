@@ -65,27 +65,12 @@ export default function Home() {
 		setPolygons([]);
 	};
 
-	const coordinateIsCloseToPolygonPoint = (coordinate: Coordinate) => {
-		for (let i = 0; i < polygons.length; i++) {
-			const polygon = polygons[i];
-			for (let j = 0; j < polygon.points.length; j++) {
-				if (coordinate.isNearPoint(polygon.points[j])) {
-					return { polygonIndex: i, pointIndex: j };
-				}
-			}
-		}
-
-		return { polygonIndex: -1, pointIndex: -1 };
-	};
-
 	const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
 		const canvas = canvasRef.current as HTMLCanvasElement;
 		const ctx = canvas.getContext("2d");
 		if (!ctx) return;
 
 		const rect = canvas.getBoundingClientRect();
-		// const x = e.clientX - rect.left;
-		// const y = e.clientY - rect.top;
 		const coordinate = new Coordinate(
 			e.clientX - rect.left,
 			e.clientY - rect.top,
@@ -175,7 +160,7 @@ export default function Home() {
 		);
 
 		const { polygonIndex, pointIndex } =
-			coordinateIsCloseToPolygonPoint(coordinate);
+			coordinate.findNearesPolygonPoint(polygons);
 
 		if (polygonIndex !== -1 && pointIndex !== -1 && pointIndex !== 0) {
 			return;
